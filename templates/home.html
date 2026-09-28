@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Fake Comment Detector{% endblock %}
+{% block body %}
+<div class="topbar">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <span class="brand-name">Fake Comment Detector</span>
+  </div>
+  <div class="topbar-actions">
+    <button class="icon-btn" onclick="toggleTheme()"><span data-theme-label>Dark</span></button>
+    <a href="{{ url_for('logout') }}" class="icon-btn">Logout</a>
+  </div>
+</div>
+
+<div class="hero">
+  <h1>Tell real feedback from spam.</h1>
+  <p>Load a dataset, train a classifier, and check individual comments for spam, scam, and engagement-bait patterns.</p>
+  <div class="hero-cta">
+    <a href="{{ url_for('detect') }}" class="btn btn-accent">Start detection →</a>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Log in — Fake Comment Detector{% endblock %}
+{% block body %}
+<div class="login-shell">
+  <button class="icon-btn theme-toggle-corner" onclick="toggleTheme()">
+    <span data-theme-label>Dark</span>
+  </button>
+
+  <div class="login-card">
+    <h1>Fake Comment Detector</h1>
+    <p class="login-sub">Sign in to continue</p>
+
+    {% if error %}
+      <div class="login-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary">Log in</button>
+    </form>
+
+    <p class="login-hint">Default: username = admin, password = admin</p>
+  </div>
+</div>
+{% endblock %}

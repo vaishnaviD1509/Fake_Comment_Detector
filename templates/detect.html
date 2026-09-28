@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Detect — Fake Comment Detector{% endblock %}
+{% block body %}
+<div class="topbar">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <span class="brand-name">Fake Comment Detector</span>
+  </div>
+  <div class="topbar-actions">
+    <a href="{{ url_for('home') }}" class="icon-btn">← Home</a>
+    <button class="icon-btn" onclick="toggleTheme()"><span data-theme-label>Dark</span></button>
+    <a href="{{ url_for('logout') }}" class="icon-btn">Logout</a>
+  </div>
+</div>
+
+<div class="detect-shell" id="detect-shell" data-model-ready="{{ 'true' if model_ready else 'false' }}">
+  <h2 class="detect-title">Run the pipeline</h2>
+  <p class="detect-sub">
+    {% if preloaded %}
+      A previously trained model is already loaded — you can jump straight to Step 4, or retrain from Step 1.
+    {% else %}
+      Work through the steps below, in order.
+    {% endif %}
+  </p>
+
+  <!-- Step 1 -->
+  <div class="step">
+    <div class="step-rail">
+      <div class="step-num" id="num-1">1</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-card">
+        <h3>Load a dataset</h3>
+        <p class="step-desc">Upload a CSV with <code>comment</code> and <code>label</code> columns, or use the bundled sample dataset.</p>
+        <div class="row">
+          <label class="file-drop" style="flex:1;">
+            <input type="file" id="csv-file" accept=".csv" onchange="handleUpload()">
+            <span id="file-drop-label">Click to choose a .csv file</span>
+          </label>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-ghost" onclick="useSample()" id="btn-sample">Use sample dataset</button>
+        </div>
+        <div class="step-status" id="status-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step">
+    <div class="step-rail">
+      <div class="step-num" id="num-2">2</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-card">
+        <h3>Preprocess</h3>
+        <p class="step-desc">Cleans text, engineers features (length, links, punctuation, spam-keyword hits), and splits train/test.</p>
+        <button class="btn btn-primary" id="btn-preprocess" onclick="runPreprocess()" disabled>Run preprocessing</button>
+        <div class="step-status" id="status-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step">
+    <div class="step-rail">
+      <div class="step-num" id="num-3">3</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-card">
+        <h3>Train</h3>
+        <p class="step-desc">Compares Linear SVM, RBF SVM, and Logistic Regression via cross-validation, then keeps the best.</p>
+        <button class="btn btn-primary" id="btn-train" onclick="runTrain()" disabled>Train model</button>
+        <div class="step-status" id="status-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="step">
+    <div class="step-rail">
+      <div class="step-num" id="num-4">4</div>
+    </div>
+    <div class="step-body">
+      <div class="step-card">
+        <h3>Analyze a comment</h3>
+        <p class="step-desc">Paste a comment to check whether it looks genuine or fake/spam.</p>
+        <textarea class="comment-input" id="comment-input" placeholder="e.g. Congratulations! Click here to claim your free prize now!"></textarea>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-accent" id="btn-predict" onclick="runPredict()" disabled>Analyze comment</button>
+        </div>
+        <div class="verdict" id="verdict"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const shellEl = document.getElementById('detect-shell');
+const state = {
+  loaded: false,
+  preprocessed: false,
+  trained: shellEl && shellEl.dataset.modelReady === 'true',
+};
+
+function setStatus(stepId, text, kind) {
+  const el = document.getElementById('status-' + stepId);
+  el.textContent = text;
+  el.className = 'step-status' + (kind ? ' ' + kind : '');
+}
+
+function markDone(stepId) {
+  document.getElementById('num-' + stepId).classList.add('done');
+}
+
+function loadingText(el, base) {
+  el.innerHTML = '<span class="spinner"></span> ' + base;
+}
+
+async function postJSON(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json();
+}
+
+async function postForm(url, formData) {
+  const res = await fetch(url, { method: 'POST', body: formData });
+  return res.json();
+}
+
+function refreshUnlocks() {
+  document.getElementById('btn-preprocess').disabled = !state.loaded;
+  document.getElementById('btn-train').disabled = !state.preprocessed;
+  document.getElementById('btn-predict').disabled = !state.trained;
+}
+
+if (state.trained) { markDone(1); markDone(2); markDone(3); markDone(4); }
+refreshUnlocks();
+
+async function handleUpload() {
+  const input = document.getElementById('csv-file');
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('file-drop-label').textContent = file.name;
+
+  setStatus(1, 'Uploading…');
+  const fd = new FormData();
+  fd.append('file', file);
+  const data = await postForm('/api/upload', fd);
+  setStatus(1, data.message, data.ok ? 'ok' : 'err');
+  if (data.ok) { state.loaded = true; markDone(1); refreshUnlocks(); }
+}
+
+async function useSample() {
+  const btn = document.getElementById('btn-sample');
+  const original = btn.textContent;
+  btn.disabled = true;
+  setStatus(1, 'Loading sample dataset…');
+  const data = await postJSON('/api/use-sample');
+  setStatus(1, data.message, data.ok ? 'ok' : 'err');
+  btn.disabled = false;
+  btn.textContent = original;
+  if (data.ok) {
+    document.getElementById('file-drop-label').textContent = 'Using sample dataset';
+    state.loaded = true; markDone(1); refreshUnlocks();
+  }
+}
+
+async function runPreprocess() {
+  const btn = document.getElementById('btn-preprocess');
+  btn.disabled = true;
+  const original = btn.textContent;
+  loadingText(btn, 'Running…');
+  setStatus(2, '');
+  const data = await postJSON('/api/preprocess');
+  btn.textContent = original;
+  setStatus(2, data.message, data.ok ? 'ok' : 'err');
+  btn.disabled = false;
+  if (data.ok) { state.preprocessed = true; markDone(2); }
+  refreshUnlocks();
+}
+
+async function runTrain() {
+  const btn = document.getElementById('btn-train');
+  btn.disabled = true;
+  const original = btn.textContent;
+  loadingText(btn, 'Training…');
+  setStatus(3, '');
+  const data = await postJSON('/api/train');
+  btn.textContent = original;
+  setStatus(3, data.message, data.ok ? 'ok' : 'err');
+  btn.disabled = false;
+  if (data.ok) { state.trained = true; markDone(3); markDone(4); }
+  refreshUnlocks();
+}
+
+async function runPredict() {
+  const comment = document.getElementById('comment-input').value.trim();
+  const verdict = document.getElementById('verdict');
+  if (!comment) return;
+
+  const btn = document.getElementById('btn-predict');
+  const original = btn.textContent;
+  loadingText(btn, 'Analyzing…');
+  btn.disabled = true;
+
+  const data = await postJSON('/api/predict', { comment });
+  btn.textContent = original;
+  btn.disabled = false;
+
+  verdict.classList.add('show');
+  if (!data.ok) {
+    verdict.className = 'verdict show fake';
+    verdict.textContent = data.message;
+    return;
+  }
+  verdict.className = 'verdict show ' + (data.is_fake ? 'fake' : 'real');
+  verdict.textContent = data.message;
+}
+</script>
+{% endblock %}

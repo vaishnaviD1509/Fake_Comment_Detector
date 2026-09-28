@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Fake Comment Detector{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  {% block body %}{% endblock %}
+
+  <script>
+    // Theme is a local device preference, not app data — stored client-side.
+    (function () {
+      const saved = localStorage.getItem('fcd-theme') || 'light';
+      if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+
+    function toggleTheme() {
+      const root = document.documentElement;
+      const isDark = root.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        root.removeAttribute('data-theme');
+        localStorage.setItem('fcd-theme', 'light');
+      } else {
+        root.setAttribute('data-theme', 'dark');
+        localStorage.setItem('fcd-theme', 'dark');
+      }
+      document.querySelectorAll('[data-theme-label]').forEach(el => {
+        el.textContent = (root.getAttribute('data-theme') === 'dark') ? 'Light' : 'Dark';
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.querySelectorAll('[data-theme-label]').forEach(el => {
+        el.textContent = isDark ? 'Light' : 'Dark';
+      });
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
